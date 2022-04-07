@@ -249,10 +249,157 @@ root: xprv9s21ZrQH143K3GJpoapnV8SFfukcVBSfeCficPSGfubmSFDxo1kuHnLisriDvSnRRuL2Qr
 derivation: m/49'/1'/0'/0/0
 derived xprv: xprvA3xqazGezXcjYigcosBVV6C613TjcQSCzGkw2wsMx6Kn8LU1NcU2y2nVuZwv9afxiD1QGJMXXeKUUuQCTABDkeV2peoBfK7MEMxbPR3qobP
 derived 32-byte secret: c9bdb49cfbaedca21c4b1f3a7803c34636b1d7dc55a717132443fc3f4c5867e8
+corresponding public key: 03a1af804ac108a8a51782198c2d034b28bf90c8803f5a53f76276fa69a4eae77f
 
 DER-signature: 304402206bb98cc2682fb71a7ce2bc72033dae383b51318359c04f1cbcbceb2263d825a80220723513601ce9a43c3e26c64170ed610eed5370a269af8fea1d84dd283bc05186
 ```
 
+Repeating the same process for all inputs we receive the following data:
+```
+Input 0:
+pubkey: 03a1af804ac108a8a51782198c2d034b28bf90c8803f5a53f76276fa69a4eae77f
+signature: 304402206bb98cc2682fb71a7ce2bc72033dae383b51318359c04f1cbcbceb2263d825a80220723513601ce9a43c3e26c64170ed610eed5370a269af8fea1d84dd283bc05186
+
+Input 1:
+pubkey: 03b22d357d64aa0c10caffcdaeb22fca282b31f011c8c2c8c6d5e56a676d52c803
+signature: 304402206a3fdc2759544f19d112c6186f530d790e5776abbc9263b98e2c554f0ff143cf022008482ed584455ffb0bc32b244998cc4f2d4a0a1c1ba9b9560a6d2129236e2c74
+```
+
 # Including signature to the PSBT
 
+We need to include signatures to every input metadata of the psbt. To decrease the size of the transaction we could remove some fields, like non-witness utxo, but for now we will keep everything as it was and only include signatures.
+
+Partial signatures are serialized with key `<02><pubkey>` and value `<der_signature><sighash>` - notice that signature also has a sighash byte at the end, `0x01` in case of SIGHASH_ALL (default sighash in Bitcoin).
+
+```
+# old input metadata
+0100720200000001da9a4b82aad88017f24aa54442fdb68844c24341cd217ae11a482312f46253a30100000000feffffff0258e2de22010000001600144395a9a9e8d9a1bcd44b8f425b4a779cf3245773809698000000000017a914336caa13e08b96080a32b5d818d59b4ab3b367428700000000010120809698000000000017a914336caa13e08b96080a32b5d818d59b4ab3b3674287010416001438971f73930f6c141d977ac4fd4a727c854935b3220603a1af804ac108a8a51782198c2d034b28bf90c8803f5a53f76276fa69a4eae77f1873c5da0a3100008001000080000000800000000000000000
+# key - <02>pubkey
+220203a1af804ac108a8a51782198c2d034b28bf90c8803f5a53f76276fa69a4eae77f
+# value - <der_signature><sighash>
+47304402206bb98cc2682fb71a7ce2bc72033dae383b51318359c04f1cbcbceb2263d825a80220723513601ce9a43c3e26c64170ed610eed5370a269af8fea1d84dd283bc0518601
+# end of input metadata
+00
+```
+
+The same for second input:
+
+```
+# old input metadata
+0100720200000001f0f3e667c77b47815006dacdb72bef07bdbe9a36fa1c62896c469cf324c0b8fe0100000000feffffff02404b4c000000000017a91481d74bcd380c05f791d1f4c81837565dec9b234a8799c4c3230100000016001439a460078122352e30e8b9520e16dd603f39395100000000010120404b4c000000000017a91481d74bcd380c05f791d1f4c81837565dec9b234a87
+0104160014bd7c79cd76a5491f01115b81372cdc9b05cedb00220603b22d357d64aa0c10caffcdaeb22fca282b31f011c8c2c8c6d5e56a676d52c8031873c5da0a3100008001000080000000800000000001000000
+# pubkey
+220203b22d357d64aa0c10caffcdaeb22fca282b31f011c8c2c8c6d5e56a676d52c803
+# signature
+47304402206a3fdc2759544f19d112c6186f530d790e5776abbc9263b98e2c554f0ff143cf022008482ed584455ffb0bc32b244998cc4f2d4a0a1c1ba9b9560a6d2129236e2c7401
+# end of input
+00
+```
+
+These values can be added to input at any place, I added them at the end for simplicity
+
 # Finalizing transaction
+
+On the host side, when we receive a signed psbt, we need to extract a raw bitcoin transaction ready for broadcasting.
+
+We start by taking a raw unsigned transaction from psbt:
+
+```
+02000000 - version, little-endian (version = 2)
+---- inputs -----
+02 - number of inputs
+---- input 0 ----
+1cb6d64ebf95ca23e9d6267b925dbd18c3935f691a867f3b83aab8f8d745d85c - previous tx hash (reversed txid of the transaction we are spending)
+01000000 - prev vout, little-endian (vout = 1)
+00 - scriptsig, empty because transaction is unsigned
+fdffffff - sequence number, little endian
+---- input 1 ----
+ea0d8d93e39b27e9c7fb76ddbc122ab2092630d7458933d35f296dbf0adaf0c7 - prev tx hash
+00000000 - prev vout
+00 - scriptsig
+fdffffff - sequence number
+---- outputs -----
+02 - 2 outputs
+---- output 0 ----
+f6073d0000000000 - amount, 8-byte little endian, 3999734 sats
+17a914251dd11457a259c3ba47e5cca3717fe4214e029887 - scriptpubkey of the output, address - 2MvdUi5o3f2tnEFh9yGvta6FzptTZtkPJC8
+---- output 1 ----
+c0d8a70000000000 - amount, 11000000 sats
+22002023570715e1ac360b097d32781d2d571f9c5d8a07daf47c627c1e1efb24cb5ac0 - scriptpubkey
+----------------
+d9000000 - locktime
+```
+
+We only need to change inputs, and in case of segwit transactions (our case) also add a segwit marker and witness data
+
+For every input we need to:
+
+- inject redeem script to scriptsig if it's not empty (yes in our case)
+- if it's a segwit transaction - construct witness data (yes in our case)
+- if it's a segwit transaction - add a segwit marker after the version
+
+An easy way to detect if the transaction is segwit or not - to look at psbt inputs metadata. Normally it's enough to check if `witness_utxo` is not empty - this should work in the 99% of cases.
+
+For more complete check any of the following should be true:
+- witness_utxo for any input is not empty
+- witness_script for any input is not empty
+- redeem script starts with `00` and followed by 20 or 32-byte len-encoded string (`0014<pubkeyhash>` or `0020<scripthash>`)
+- redeem script is empty but previous utxo scriptpubkey starts with `00` followed by 20 or 32-byte len-encoded string
+
+Witness data for single-sig contains two elements - a signature and a pubkey:
+
+```
+# witness for input 0:
+02 - number of items
+# der-signature with sighash
+47304402206bb98cc2682fb71a7ce2bc72033dae383b51318359c04f1cbcbceb2263d825a80220723513601ce9a43c3e26c64170ed610eed5370a269af8fea1d84dd283bc0518601
+# public key
+2103a1af804ac108a8a51782198c2d034b28bf90c8803f5a53f76276fa69a4eae77f
+
+# witness for input 1:
+02 - number of items
+# signature
+47304402206a3fdc2759544f19d112c6186f530d790e5776abbc9263b98e2c554f0ff143cf022008482ed584455ffb0bc32b244998cc4f2d4a0a1c1ba9b9560a6d2129236e2c7401
+# pubkey
+2103b22d357d64aa0c10caffcdaeb22fca282b31f011c8c2c8c6d5e56a676d52c803
+```
+
+Annotated transaction with injected witnesses, segwit marker and redeem script:
+
+```
+02000000 - version
+0001 - segwit flag and marker
+---- inputs -----
+02 - number of inputs
+---- input 0 ----
+1cb6d64ebf95ca23e9d6267b925dbd18c3935f691a867f3b83aab8f8d745d85c - txid
+01000000 - vout
+1716001438971f73930f6c141d977ac4fd4a727c854935b3 - scriptsig (redeem script from psbt input 0)
+fdffffff - sequence number
+---- input 1 ----
+ea0d8d93e39b27e9c7fb76ddbc122ab2092630d7458933d35f296dbf0adaf0c7 - txid
+00000000 - vout
+17160014bd7c79cd76a5491f01115b81372cdc9b05cedb00 - scriptsig (redeem script from psbt input 1)
+fdffffff - sequence number
+---- outputs ----
+02 - number of outputs
+---- output 0 ----
+f6073d0000000000 - amount
+17a914251dd11457a259c3ba47e5cca3717fe4214e029887 - scriptpubkey
+---- output 1 ----
+c0d8a70000000000 - amount
+22002023570715e1ac360b097d32781d2d571f9c5d8a07daf47c627c1e1efb24cb5ac0 - scriptpubkey
+---- witness data ----
+---- witness for input 0 ---
+0247304402206bb98cc2682fb71a7ce2bc72033dae383b51318359c04f1cbcbceb2263d825a80220723513601ce9a43c3e26c64170ed610eed5370a269af8fea1d84dd283bc05186012103a1af804ac108a8a51782198c2d034b28bf90c8803f5a53f76276fa69a4eae77f
+---- witness for input 1 ----
+0247304402206a3fdc2759544f19d112c6186f530d790e5776abbc9263b98e2c554f0ff143cf022008482ed584455ffb0bc32b244998cc4f2d4a0a1c1ba9b9560a6d2129236e2c74012103b22d357d64aa0c10caffcdaeb22fca282b31f011c8c2c8c6d5e56a676d52c803
+---- locktime ---
+d9000000
+```
+
+Final transaction ready for broadcast:
+
+```
+020000000001021cb6d64ebf95ca23e9d6267b925dbd18c3935f691a867f3b83aab8f8d745d85c010000001716001438971f73930f6c141d977ac4fd4a727c854935b3fdffffffea0d8d93e39b27e9c7fb76ddbc122ab2092630d7458933d35f296dbf0adaf0c70000000017160014bd7c79cd76a5491f01115b81372cdc9b05cedb00fdffffff02f6073d000000000017a914251dd11457a259c3ba47e5cca3717fe4214e029887c0d8a7000000000022002023570715e1ac360b097d32781d2d571f9c5d8a07daf47c627c1e1efb24cb5ac00247304402206bb98cc2682fb71a7ce2bc72033dae383b51318359c04f1cbcbceb2263d825a80220723513601ce9a43c3e26c64170ed610eed5370a269af8fea1d84dd283bc05186012103a1af804ac108a8a51782198c2d034b28bf90c8803f5a53f76276fa69a4eae77f0247304402206a3fdc2759544f19d112c6186f530d790e5776abbc9263b98e2c554f0ff143cf022008482ed584455ffb0bc32b244998cc4f2d4a0a1c1ba9b9560a6d2129236e2c74012103b22d357d64aa0c10caffcdaeb22fca282b31f011c8c2c8c6d5e56a676d52c803d9000000
+```
