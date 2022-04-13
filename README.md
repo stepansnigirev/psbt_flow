@@ -48,7 +48,7 @@ chain code: 7923408dadd3c7b56eed15567707ae5e5dca089de972e07f3b860450e2a3b70e
 secret: 1837c1be8e2995ec11cda2b066151be2cfb48adf9e47b151d46adab3a21cdf67
 
 Child with index 49' (hardened):
-index = 0x80000000 + 49 = 80000031 in little endian
+index = 0x80000000 + 49 = 80000031 in big endian
 
 For hardened derivation we use private key in the hash:
 
@@ -60,15 +60,15 @@ child chain_code: fe82159c44da72e34203f1215d494638d17a1ee587db3d11651654ac4e2b1f
 private key tweak: 6a3ececfca6e6b1eabd5167925467858ae4451894a83fddc88aa966a438ce413
 child private key = parent private key + tweak = 8276908e5898010abda2b9298b5b943b7df8dc68e8cbaf2e5d15711de5a9c37a
 
-Next step - index 1' (80000001 in little endian)
+Next step - index 1' (80000001 in big endian)
 chain code: 3b0af4d37b373d810fcf34cdf2e87cf68df5022812768d7d28d4451dc30e8951
 private key: 7eae2f0d227922ea9e95d7577a2d31a25b22a43be6856749db6eb5e220dabeea
 
-Next - index 0' (80000000 in little endian):
+Next - index 0' (80000000 in big endian):
 chain code: 29493969d5af07bdca312802a84f43f87f2522ee84d4f880947d10849675bd3d
 secret: 25411fe7b0d083e9265a2d0f29ce7b10eb9c5570306144c77f0f4dfe9238747e
 
-Next - index 1 (00000001 in little endian), it's not hardened so we use public key in hmac:
+Next - index 1 (00000001 in big endian), it's not hardened so we use public key in hmac:
 child_tweak, child_chain_code = hmac-sha512(chain_code, <public_key><index>)
 hmac-sha512(29493969d5af07bdca312802a84f43f87f2522ee84d4f880947d10849675bd3d, 0262c1521f5fd87bbb4055f9f6e866d3eaebd179d5bfb9adac3aec682f12948a6700000001)
 result:
@@ -77,7 +77,7 @@ child chain_code: 91fab97e3048e663e757405b7b37e476ccb7aa765a0d1ce90908c4fc325c01
 private key tweak: 5f51bb0ce3f1ae23ebec65614a3308f3bb0eeead9d5af6dc4e400759673dac25
 child private key = parent private key + tweak = 8492daf494c2320d1246927074018404a6ab441dcdbc3ba3cd4f5557f97620a3
 
-Next - index 0 (00000000 in le), not hardened:
+Next - index 0 (00000000 in be), not hardened:
 chain code: 6016fd78e15211b3260f67911dbe28f59889e471b6f05547ef39f3f98ba85825
 private key: f0f6c08500d34c351d14434589913c50e56e03c41e399488db476114c487053f
 ```
